@@ -213,6 +213,7 @@ class CrossSeed(_PluginBase):
     _nolabels = None
     _nopaths = None
     _clearcache = False
+    _skip_check = False
     # 退出事件
     _event = Event()
     _torrent_tags = ["已整理", "辅种"]
@@ -249,6 +250,7 @@ class CrossSeed(_PluginBase):
             self._downloaders = config.get("downloaders")
             self._torrentpath = config.get("torrentpath")  # 种子路径和下载器对应  /qb,/tr
             self._torrentpaths = self._torrentpath.strip().split(",")
+            self._skip_check = config.get("skip_check")
             self._sites = config.get("sites") or []
             self._notify = config.get("notify")
             self._nolabels = config.get("nolabels")
@@ -549,6 +551,22 @@ class CrossSeed(_PluginBase):
                                 },
                                 'content': [
                                     {
+                                        'component': 'VSwitch',
+                                        'props': {
+                                            'model': 'skip_check',
+                                            'label': '跳过校验',
+                                        }
+                                    }
+                                ]
+                            },
+                            {
+                                'component': 'VCol',
+                                'props': {
+                                    'cols': 12,
+                                    'md': 6
+                                },
+                                'content': [
+                                    {
                                         'component': 'VTextField',
                                         'props': {
                                             'model': 'cron',
@@ -716,6 +734,7 @@ class CrossSeed(_PluginBase):
             "token": "",
             "downloaders": [],
             "torrentpath": "",
+            "skip_check": False,
             "sites": [],
             "nopaths": "",
             "nolabels": ""
@@ -733,6 +752,7 @@ class CrossSeed(_PluginBase):
             "token": self._token,
             "downloaders": self._downloaders,
             "torrentpath": self._torrentpath,
+            "skip_check": self._skip_check,
             "sites": self._sites,
             "notify": self._notify,
             "nolabels": self._nolabels,
@@ -792,10 +812,10 @@ class CrossSeed(_PluginBase):
                 torrent_path = Path(self._torrentpaths[idx]) / f"{hash_str}.torrent"
                 torrent_info = None
                 if not torrent_path.exists():
-                    if False and downloader == "qbittorrent":
+                    if downloader == "qbittorrent":
                         # qb开启SQLite功能后将不再以hash命名的方式保存torrent文件
                         # TODO 导出功能需要qb4.5.0以上版本才支持
-                        logger.warn(f"QB种子文件不存在：{torrent_path} 尝试远程导出种子")
+                        #logger.warn(f"QB种子文件不存在：{torrent_path} 尝试远程导出种子")
                         try:
                             torrent_data = torrent.export()
                             torrent_info, err = TorInfo.from_data(torrent_data)
@@ -1023,7 +1043,7 @@ class CrossSeed(_PluginBase):
         logger.info(f"下载器 {downloader} 辅种完成")
 
     def __download(self, downloader: str, content: Union[bytes, str],
-                   save_path: str) -> Optional[str]:
+                   save_path: str, is_skip_checking: bool = False) -> Optional[str]:
         """
         添加下载任务
         """
@@ -1033,6 +1053,7 @@ class CrossSeed(_PluginBase):
             state = self.qb.add_torrent(content=content,
                                         download_dir=save_path,
                                         is_paused=True,
+                                        is_skip_checking=is_skip_checking,
                                         tag=["已整理", "辅种", tag])
             if not state:
                 return None
@@ -1111,7 +1132,8 @@ class CrossSeed(_PluginBase):
         logger.info(f"添加下载任务：{tor.get_name_id_tag()} ...")
         download_id = self.__download(downloader=downloader,
                                       content=content,
-                                      save_path=save_path)
+                                      save_path=save_path,
+                                      is_skip_checking=self._skip_check)
         if not download_id:
             # 下载失败
             self.fail += 1
@@ -1129,7 +1151,7 @@ class CrossSeed(_PluginBase):
             # 下载成功
             logger.info(f"成功添加辅种下载，站点种子：{tor.get_name_id_tag()}")
             # TR会自动校验
-            if downloader == "qbittorrent":
+            if downloader == "qbittorrent" and not self._skip_check:
                 # 开始校验种子
                 self.__get_downloader(downloader).recheck_torrents(ids=[download_id])
             # 成功也加入缓存，有一些改了路径校验不通过的，手动删除后，下一次又会辅上
