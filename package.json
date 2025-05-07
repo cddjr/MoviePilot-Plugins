@@ -658,6 +658,19 @@
             "v1.3": "插件实际无需一直开启，启用一次后自动关闭"
         }
     },
+    "TestPympler": {
+        "name": "Pympler",
+        "description": "TBD",
+        "labels": "工具",
+        "version": "0.1",
+        "icon": "Bookstack_A.png",
+        "author": "cddjr",
+        "level": 1,
+        "v2": true,
+        "history": {
+            "v0.1": "TBD"
+        }
+    },
     "RemoteIdentifiers": {
         "name": "共享识别词",
         "description": "从Github、Etherpad等远程文件中获取共享识别词并应用。",
