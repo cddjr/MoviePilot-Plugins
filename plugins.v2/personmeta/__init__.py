@@ -38,7 +38,7 @@ class PersonMeta(_PluginBase):
     # 插件图标
     plugin_icon = "actor.png"
     # 插件版本
-    plugin_version = "2.2.1"
+    plugin_version = "2.2.2"
     # 插件作者
     plugin_author = "jxxghp"
     # 作者主页
@@ -84,7 +84,7 @@ class PersonMeta(_PluginBase):
                                     run_date=datetime.datetime.now(
                                         tz=pytz.timezone(settings.TZ)) + datetime.timedelta(seconds=3)
                                     )
-            logger.info(f"演职人员刮削服务启动，立即运行一次")
+            logger.info("演职人员刮削服务启动，立即运行一次")
             # 关闭一次性开关
             self._onlyonce = False
             # 保存配置
@@ -352,6 +352,9 @@ class PersonMeta(_PluginBase):
         if not existsinfo or not existsinfo.itemid:
             logger.warn(f"{mediainfo.title_year} 在媒体库中不存在")
             return
+        if existsinfo.server_type not in ["emby", "jellyfin", "plex"]:
+            logger.warn(f"媒体服务器 {existsinfo.server} 类型 {existsinfo.server_type} 不支持刮削演员信息")
+            return
         # 查询条目详情
         iteminfo = MediaServerChain().iteminfo(server=existsinfo.server, item_id=existsinfo.itemid)
         if not iteminfo:
@@ -372,6 +375,9 @@ class PersonMeta(_PluginBase):
         mediaserverchain = MediaServerChain()
         for server, service in service_infos.items():
             # 扫描所有媒体库
+            if service.type not in ["emby", "jellyfin", "plex"]:
+                logger.warn(f"媒体服务器 {server} 类型 {service.type} 不支持刮削演员信息")
+                continue
             logger.info(f"开始刮削服务器 {server} 的演员信息 ...")
             for library in mediaserverchain.librarys(server):
                 logger.info(f"开始刮削媒体库 {library.name} 的演员信息 ...")
@@ -384,7 +390,7 @@ class PersonMeta(_PluginBase):
                             and "Movie" not in item.item_type:
                         continue
                     if self._event.is_set():
-                        logger.info(f"演职人员刮削服务停止")
+                        logger.info("演职人员刮削服务停止")
                         return
                     # 处理条目
                     logger.info(f"开始刮削 {item.title} 的演员信息 ...")
@@ -411,7 +417,7 @@ class PersonMeta(_PluginBase):
         # 更新当前媒体项人物
         for people in iteminfo.get("People", []) or []:
             if self._event.is_set():
-                logger.info(f"演职人员刮削服务停止")
+                logger.info("演职人员刮削服务停止")
                 return
             if not people.get("Name"):
                 continue
@@ -790,7 +796,7 @@ class PersonMeta(_PluginBase):
             return __get_emby_iteminfo()
         elif server_type == "jellyfin":
             return __get_jellyfin_iteminfo()
-        else:
+        elif server_type == "plex":
             return __get_plex_iteminfo()
 
     def get_items(self, server: str, server_type: str, parentid: str, mtype: str = None) -> dict:
@@ -904,7 +910,7 @@ class PersonMeta(_PluginBase):
             return __get_emby_items()
         elif server_type == "jellyfin":
             return __get_jellyfin_items()
-        else:
+        elif server_type == "plex":
             return __get_plex_items()
 
     def set_iteminfo(self, server: str, server_type: str, itemid: str, iteminfo: dict):
@@ -981,7 +987,7 @@ class PersonMeta(_PluginBase):
             return __set_emby_iteminfo()
         elif server_type == "jellyfin":
             return __set_jellyfin_iteminfo()
-        else:
+        elif server_type == "plex":
             return __set_plex_iteminfo()
 
     @retry(RequestException, logger=logger)
@@ -1028,7 +1034,10 @@ class PersonMeta(_PluginBase):
                         "Content-Type": "image/png"
                     }
                 )
-                if res and res.status_code in [200, 204]:
+                if res is None:
+                    logger.warn("更新Emby媒体项图片失败，请检查网络连通性")
+                    return False
+                if res.status_code in [200, 204]:
                     return True
                 else:
                     logger.error(f"更新Emby媒体项图片失败，错误码：{res.status_code}")
@@ -1046,7 +1055,10 @@ class PersonMeta(_PluginBase):
                 url = f'[HOST]Items/{itemid}/RemoteImages/Download?' \
                       f'Type=Primary&ImageUrl={imageurl}&ProviderName=TheMovieDb&api_key=[APIKEY]'
                 res = service.instance.post_data(url=url)
-                if res and res.status_code in [200, 204]:
+                if res is None:
+                    logger.warn("更新Jellyfin媒体项图片失败，请检查网络连通性")
+                    return False
+                if res.status_code in [200, 204]:
                     return True
                 else:
                     logger.error(f"更新Jellyfin媒体项图片失败，错误码：{res.status_code}")
@@ -1075,7 +1087,7 @@ class PersonMeta(_PluginBase):
                 return __set_emby_item_image(image_base64)
         elif server_type == "jellyfin":
             return __set_jellyfin_item_image()
-        else:
+        elif server_type == "plex":
             return __set_plex_item_image()
         return None
 
