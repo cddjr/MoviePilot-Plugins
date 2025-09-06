@@ -1049,8 +1049,28 @@ class PersonMeta(_PluginBase):
         def __set_jellyfin_item_image():
             """
             更新Jellyfin媒体项图片
-            # FIXME 改为预下载图片
             """
+            # 2021年发布的 Jellyfin 10.7.0 已支持预下载图片
+            try:
+                image_base64 = __download_image()
+                if image_base64:
+                    url = f'[HOST]Items/{itemid}/Images/Primary?api_key=[APIKEY]'
+                    res = service.instance.post_data(
+                        url=url,
+                        data=image_base64,
+                        headers={
+                            "Content-Type": "image/png"
+                        }
+                    )
+                    if res is None:
+                        logger.warn("更新Jellyfin媒体项图片失败，请检查网络连通性")
+                        return False
+                    if res.status_code in [200, 204]:
+                        return True
+            except Exception:
+                # 忽略异常
+                pass
+            # 回退使用Jellyfin服务器下载图片
             try:
                 url = f'[HOST]Items/{itemid}/RemoteImages/Download?' \
                       f'Type=Primary&ImageUrl={imageurl}&ProviderName=TheMovieDb&api_key=[APIKEY]'
