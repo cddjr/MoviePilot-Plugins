@@ -1009,14 +1009,17 @@ class PersonMeta(_PluginBase):
                 if "doubanio.com" in imageurl:
                     r = RequestUtils(headers={
                         'Referer': "https://movie.douban.com/"
-                    }, ua=settings.USER_AGENT).get_res(url=imageurl, raise_exception=True)
+                    }, ua=settings.USER_AGENT).get_res(url=imageurl, raise_exception=False)
                 else:
                     r = RequestUtils(proxies=settings.PROXY,
-                                     ua=settings.USER_AGENT).get_res(url=imageurl, raise_exception=True)
-                if r:
+                                     ua=settings.USER_AGENT).get_res(url=imageurl, raise_exception=False)
+                if r is None:
+                    logger.warn(f"{imageurl} 图片下载失败，请检查网络连通性")
+                    return None
+                if r.status_code == 200:
                     return base64.b64encode(r.content).decode()
                 else:
-                    logger.warn(f"{imageurl} 图片下载失败，请检查网络连通性")
+                    logger.warn(f"{imageurl} 图片下载失败，错误码：{r.status_code}")
             except Exception as err:
                 logger.error(f"下载图片失败：{str(err)}")
             return None
