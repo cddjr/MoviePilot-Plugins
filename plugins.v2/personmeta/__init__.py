@@ -1067,9 +1067,10 @@ class PersonMeta(_PluginBase):
                         return False
                     if res.status_code in [200, 204]:
                         return True
-            except Exception:
-                # 忽略异常
-                pass
+                    else:
+                        logger.warn(f"预下载Jellyfin媒体项图片失败，错误码：{res.status_code}")
+            except Exception as err:
+                logger.error(f"预下载Jellyfin媒体项图片失败：{err}")
             # 回退使用Jellyfin服务器下载图片
             try:
                 url = f'[HOST]Items/{itemid}/RemoteImages/Download?' \
@@ -1117,6 +1118,11 @@ class PersonMeta(_PluginBase):
         获取TMDB别名中的中文名
         """
         try:
+            # 优先处理人物展示的名字，避免部分中国演员的别名缺少中文或只有曾用名的问题
+            # 如 冯绍峰936431、杨颖150899 等演员
+            if personinfo.name and StringUtils.is_chinese(personinfo.name):
+                # 使用cn2an将繁体转化为简体
+                return zhconv.convert(personinfo.name, "zh-hans")
             also_known_as = personinfo.also_known_as or []
             if also_known_as:
                 for name in also_known_as:
